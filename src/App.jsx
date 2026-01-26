@@ -476,27 +476,30 @@ export default function CreditCardPlanner() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mb-4">
-              <Calendar className="w-5 h-5" />
-              <h3 className="font-semibold text-lg">Plan de Pagos</h3>
-              <select
-                value={planMonths}
-                onChange={(e) => {
-                  const newMonths = parseInt(e.target.value);
-                  setPlanMonths(newMonths);
-                  setPaymentPlan(Array(newMonths).fill(''));
-                }}
-                className="ml-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white font-medium"
-              >
-                <option value="6">6 meses</option>
-                <option value="12">12 meses</option>
-              </select>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Calendar className="w-5 h-5" />
+                <h3 className="font-semibold text-lg">Plan de Pagos</h3>
+                <select
+                  value={planMonths}
+                  onChange={(e) => {
+                    const newMonths = parseInt(e.target.value);
+                    setPlanMonths(newMonths);
+                    setPaymentPlan(Array(newMonths).fill(''));
+                  }}
+                  className="ml-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white font-medium"
+                >
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                </select>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Define cuánto pagarás cada mes. Puedes hacer pagos de pago mínimo, escalonados o personalizados. Recuerda que pagos mayores reducen los intereses totales.</p>
             </div>
             
             <div className="mb-4" style={{display: 'grid', gridTemplateColumns: `repeat(${planMonths === 6 ? 3 : 6}, minmax(0, 1fr))`, gap: '0.5rem'}}>
               {paymentPlan.map((payment, index) => (
                 <div key={index} className="flex flex-col relative">
-                  <label className="text-xs font-medium text-gray-600 mb-1">M{index + 1}</label>
+                  <label className="text-xs font-medium text-gray-600 mb-1">Mes {index + 1}</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -575,7 +578,10 @@ export default function CreditCardPlanner() {
           </div>
 
           <div className="mb-8">
-            <h3 className="font-semibold text-lg mb-4">📊 Proyección del Plan</h3>
+            <div className="mb-4">
+              <h3 className="font-semibold text-lg mb-2">Proyección del Plan</h3>
+              <p className="text-sm text-gray-600">Visualiza cómo evoluciona tu balance y los intereses acumulados mes a mes según tus pagos. Los gráficos muestran el progreso hacia la eliminación de tu deuda.</p>
+            </div>
             
             {planProjection[planMonths - 1]?.balance > 0 && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
@@ -643,24 +649,18 @@ export default function CreditCardPlanner() {
                   <Line yAxisId="right" type="monotone" dataKey="totalInterest" stroke="#ef4444" strokeWidth={2} name="Intereses Acumulados" />
                 </LineChart>
               </ResponsiveContainer>
-              
-              <div className="flex justify-around mt-4 px-4 flex-wrap gap-2">
-                {planProjection.slice(0, 12).map((data, index) => (
-                  <div key={index} className="text-center">
-                    <div className="text-2xl">{data.emoji}</div>
-                    <div className="text-xs text-gray-500">M{data.month}</div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 
           {balance > 0 && (
             <div className="mb-8">
-              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Proyecciones de Pago
-              </h3>
+              <div className="mb-4">
+                <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Proyecciones de Pago
+                </h3>
+                <p className="text-sm text-gray-600">Compara diferentes escenarios de pago: el pago mínimo, el recomendado o uno personalizado. Observa cuánto tiempo tardarás en saldar la deuda y cuántos intereses pagarás en cada caso.</p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-gray-200 rounded-lg p-4 bg-green-50">
                   <div className="font-medium mb-3">Pago Recomendado (Mínimo + 50%)</div>
