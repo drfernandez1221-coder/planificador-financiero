@@ -304,7 +304,7 @@ export default function CreditCardPlanner() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Límite de Crédito ($)</label>
+                  <label className="block text-sm font-medium mb-2">Límite de Crédito</label>
                   <input
                     type="number"
                     value={creditLimit || ''}
@@ -314,7 +314,7 @@ export default function CreditCardPlanner() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Balance Actual ($)</label>
+                  <label className="block text-sm font-medium mb-2">Balance Actual</label>
                   <input
                     type="number"
                     value={balance || ''}
@@ -344,11 +344,11 @@ export default function CreditCardPlanner() {
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-blue-900 mb-2">📋 Resumen</h3>
-              <div className="text-sm text-blue-800 space-y-1">
+            <div className="bg-blue-100 border-2 border-blue-500 rounded-lg p-5 mb-6 shadow-md">
+              <h3 className="font-bold text-blue-900 mb-3 text-base">📋 Resumen</h3>
+              <div className="text-sm text-blue-900 space-y-2 font-medium">
                 <div>• Límite: ${creditLimit.toLocaleString()} • Balance: ${balance.toFixed(2)}</div>
-                <div>• Tasa: {annualRate}% anual • Corte: día {cutoffDay} • Límite pago: día {paymentDueDay}</div>
+                <div>• Tasa: {annualRate}% anual • Corte: día {cutoffDay || '-'} • Límite pago: día {paymentDueDay || '-'}</div>
               </div>
             </div>
 
