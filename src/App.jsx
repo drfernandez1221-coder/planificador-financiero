@@ -21,6 +21,7 @@ export default function CreditCardPlanner() {
   const [cutoffDay, setCutoffDay] = useState('15');
   const [paymentDueDay, setPaymentDueDay] = useState('25');
   
+  const [planMonths, setPlanMonths] = useState(12);
   const [paymentPlan, setPaymentPlan] = useState(Array(12).fill(''));
   const chartRef = useRef(null);
 
@@ -83,19 +84,17 @@ export default function CreditCardPlanner() {
   };
 
   const autoFillPaymentPlan = (type) => {
-    const newPlan = [...paymentPlan];
-    
     if (type === 'minimum') {
       // Llenar con pago mínimo
-      const newPlan = Array(12).fill(minPayment.toFixed(2));
+      const newPlan = Array(planMonths).fill(minPayment.toFixed(2));
       setPaymentPlan(newPlan);
     } else if (type === 'graduated') {
-      // Pagos escalonados para saldar en un año
+      // Pagos escalonados para saldar en el período seleccionado
       let remainingBalance = balance;
       const graduatedPlan = [];
       
-      for (let i = 0; i < 12; i++) {
-        const monthsLeft = 12 - i;
+      for (let i = 0; i < planMonths; i++) {
+        const monthsLeft = planMonths - i;
         const interest = remainingBalance * monthlyRate;
         const payment = (remainingBalance + interest) / monthsLeft;
         graduatedPlan.push(Math.max(payment, minPayment).toFixed(2));
@@ -118,7 +117,7 @@ export default function CreditCardPlanner() {
     let remainingBalance = balance;
     let totalInterest = totalInterestPaid;
     
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < planMonths; i++) {
       const payment = parseFloat(paymentPlan[i]) || 0;
       
       if (remainingBalance <= 0) {
@@ -181,6 +180,7 @@ export default function CreditCardPlanner() {
     setAchievements([]);
     setShowWarning(false);
     setShowSettings(false);
+    setPlanMonths(12);
     setPaymentPlan(Array(12).fill(''));
   };
 
@@ -476,12 +476,24 @@ export default function CreditCardPlanner() {
               </div>
             </div>
 
-            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+            <div className="flex items-center gap-3 mb-4">
               <Calendar className="w-5 h-5" />
-              Plan de Pagos (12 meses)
-            </h3>
+              <h3 className="font-semibold text-lg">Plan de Pagos</h3>
+              <select
+                value={planMonths}
+                onChange={(e) => {
+                  const newMonths = parseInt(e.target.value);
+                  setPlanMonths(newMonths);
+                  setPaymentPlan(Array(newMonths).fill(''));
+                }}
+                className="ml-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white font-medium"
+              >
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+              </select>
+            </div>
             
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-4">
+            <div className="mb-4" style={{display: 'grid', gridTemplateColumns: `repeat(${planMonths === 6 ? 3 : 6}, minmax(0, 1fr))`, gap: '0.5rem'}}>
               {paymentPlan.map((payment, index) => (
                 <div key={index} className="flex flex-col relative">
                   <label className="text-xs font-medium text-gray-600 mb-1">M{index + 1}</label>
@@ -552,7 +564,7 @@ export default function CreditCardPlanner() {
               </button>
               <button
                 onClick={() => {
-                  setPaymentPlan(Array(12).fill(''));
+                  setPaymentPlan(Array(planMonths).fill(''));
                   setShowCellMenu(null);
                 }}
                 className="flex-1 min-w-[150px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
@@ -565,6 +577,20 @@ export default function CreditCardPlanner() {
           <div className="mb-8">
             <h3 className="font-semibold text-lg mb-4">📊 Proyección del Plan</h3>
             
+            {planProjection[planMonths - 1]?.balance > 0 && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">⚠️ Estos pagos no son suficientes</h3>
+                    <p className="text-sm text-red-800 mt-1">
+                      Estos pagos no son suficientes para saldar el monto total adeudado en el tiempo establecido. Al finalizar el mes {planMonths}, aún quedaría un saldo de ${planProjection[planMonths - 1]?.balance.toFixed(2)}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {planProjection.some(p => p.payment > 0 && p.payment < minPayment * 0.8) && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
                 <div className="flex gap-3">
@@ -587,7 +613,15 @@ export default function CreditCardPlanner() {
                     dataKey="month" 
                     label={{ value: 'Mes', position: 'insideBottom', offset: -5 }}
                   />
-                  <YAxis label={{ value: 'Balance ($)', angle: -90, position: 'insideLeft' }} />
+                  <YAxis 
+                    yAxisId="left"
+                    label={{ value: 'Balance ($)', angle: -90, position: 'insideLeft' }} 
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    label={{ value: 'Intereses ($)', angle: 90, position: 'insideRight' }}
+                  />
                   <Tooltip 
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
@@ -605,8 +639,8 @@ export default function CreditCardPlanner() {
                     }}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2} name="Balance" />
-                  <Line type="monotone" dataKey="totalInterest" stroke="#ef4444" strokeWidth={2} name="Intereses Acumulados" />
+                  <Line yAxisId="left" type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2} name="Balance" />
+                  <Line yAxisId="right" type="monotone" dataKey="totalInterest" stroke="#ef4444" strokeWidth={2} name="Intereses Acumulados" />
                 </LineChart>
               </ResponsiveContainer>
               
