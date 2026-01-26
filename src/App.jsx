@@ -756,14 +756,11 @@ export default function CreditCardPlanner() {
 
           <div className="mb-6">
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
-              <div className="flex gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-amber-900">Aviso Importante</h3>
-                  <p className="text-sm text-amber-800 mt-1">
-                    Cálculos estimados sujetos a variación según la entidad financiera. Consulta con tu banco para más información.
-                  </p>
-                </div>
+              <div className="flex gap-3 items-center">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  Cálculos estimados sujetos a variación según la entidad financiera. Consulta con tu banco para más información.
+                </p>
               </div>
             </div>
 
@@ -1022,38 +1019,40 @@ export default function CreditCardPlanner() {
               Consejos Financieros
             </h3>
             
-            {(() => {
-              const tips = getFinancialTips();
-              return (
-                <div className={`border-l-4 rounded-lg p-5 ${
-                  tips.severity === 'critical' ? 'bg-red-50 border-red-500' :
-                  tips.severity === 'warning' ? 'bg-yellow-50 border-yellow-500' :
-                  tips.severity === 'info' ? 'bg-blue-50 border-blue-500' :
-                  'bg-green-50 border-green-500'
-                }`}>
-                  <h4 className={`font-semibold text-lg mb-3 ${
-                    tips.severity === 'critical' ? 'text-red-900' :
-                    tips.severity === 'warning' ? 'text-yellow-900' :
-                    tips.severity === 'info' ? 'text-blue-900' :
-                    'text-green-900'
-                  }`}>
-                    {tips.icon} {tips.title}
-                  </h4>
-                  <div className={`text-sm space-y-2 ${
-                    tips.severity === 'critical' ? 'text-red-800' :
-                    tips.severity === 'warning' ? 'text-yellow-800' :
-                    tips.severity === 'info' ? 'text-blue-800' :
-                    'text-green-800'
-                  }`}>
-                    {tips.tips.map((tip, index) => (
-                      <p key={index}>{tip}</p>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                {(() => {
+                  const tips = getFinancialTips();
+                  return (
+                    <div className={`border-l-4 rounded-lg p-4 h-full ${
+                      tips.severity === 'critical' ? 'bg-red-50 border-red-500' :
+                      tips.severity === 'warning' ? 'bg-yellow-50 border-yellow-500' :
+                      tips.severity === 'info' ? 'bg-blue-50 border-blue-500' :
+                      'bg-green-50 border-green-500'
+                    }`}>
+                      <h4 className={`font-semibold text-sm mb-2 ${
+                        tips.severity === 'critical' ? 'text-red-900' :
+                        tips.severity === 'warning' ? 'text-yellow-900' :
+                        tips.severity === 'info' ? 'text-blue-900' :
+                        'text-green-900'
+                      }`}>
+                        {tips.icon} {tips.title}
+                      </h4>
+                      <div className={`text-sm space-y-1 ${
+                        tips.severity === 'critical' ? 'text-red-800' :
+                        tips.severity === 'warning' ? 'text-yellow-800' :
+                        tips.severity === 'info' ? 'text-blue-800' :
+                        'text-green-800'
+                      }`}>
+                        {tips.tips.map((tip, index) => (
+                          <p key={index}>{tip}</p>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
                 <h4 className="font-semibold text-purple-900 mb-3">📚 Educación Financiera</h4>
                 <ul className="text-sm text-purple-800 space-y-2">
@@ -1063,6 +1062,7 @@ export default function CreditCardPlanner() {
                   <li>✓ Cada pago extra reduce significativamente los intereses</li>
                 </ul>
               </div>
+
               <div className="bg-gradient-to-br from-orange-50 to-pink-50 border border-orange-200 rounded-lg p-4">
                 <h4 className="font-semibold text-orange-900 mb-3">💡 Acciones Recomendadas</h4>
                 <ul className="text-sm text-orange-800 space-y-2">
