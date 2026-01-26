@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { CreditCard, TrendingUp, AlertCircle, Trophy, DollarSign, RotateCcw, ShoppingCart, Settings, Calendar, Download, FileText, Lightbulb, ChevronDown } from 'lucide-react';
+import { CreditCard, TrendingUp, AlertCircle, Trophy, DollarSign, RotateCcw, ShoppingCart, Settings, Calendar, Download, FileText, Lightbulb, X } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import html2pdf from 'html2pdf.js';
 
@@ -20,6 +20,15 @@ export default function CreditCardPlanner() {
   
   const [cutoffDay, setCutoffDay] = useState('');
   const [paymentDueDay, setPaymentDueDay] = useState('');
+  const [daysToPayInput, setDaysToPayInput] = useState('');
+  const [showCutoffCalendar, setShowCutoffCalendar] = useState(false);
+  const [showPaymentCalendar, setShowPaymentCalendar] = useState(false);
+  
+  // Estados para navegación de calendarios
+  const [cutoffCalendarMonth, setCutoffCalendarMonth] = useState(new Date().getMonth());
+  const [cutoffCalendarYear, setCutoffCalendarYear] = useState(new Date().getFullYear());
+  const [paymentCalendarMonth, setPaymentCalendarMonth] = useState(new Date().getMonth());
+  const [paymentCalendarYear, setPaymentCalendarYear] = useState(new Date().getFullYear());
   
   const [planMonths, setPlanMonths] = useState(6);
   const [paymentPlan, setPaymentPlan] = useState(Array(6).fill(''));
@@ -28,6 +37,85 @@ export default function CreditCardPlanner() {
   const minPayment = Math.max(balance * 0.05, 25);
   const availableCredit = creditLimit - balance;
   const annualRate = (monthlyRate * 12 * 100).toFixed(1);
+
+  // Calcular fecha límite de pago dinámicamente basada en días para pagar
+  const calculatePaymentDueDay = () => {
+    if (!cutoffDay || !daysToPayInput) return '';
+    
+    const cutoff = parseInt(cutoffDay);
+    const daysToAdd = parseInt(daysToPayInput);
+    
+    // Usar una fecha de referencia para obtener el próximo mes
+    const referenceDate = new Date(2024, 0, cutoff);
+    referenceDate.setMonth(referenceDate.getMonth() + 1);
+    
+    // Agregar los días especificados
+    referenceDate.setDate(referenceDate.getDate() + daysToAdd);
+    
+    // Limitar al último día del mes si excede
+    const nextMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    let dayInMonth = Math.min(referenceDate.getDate(), nextMonth.getDate());
+    
+    // Evitar sábados (6) y domingos (0)
+    const tempDate = new Date(2024, 0, 1); // Fecha base para calcular día de semana
+    tempDate.setDate(dayInMonth);
+    const dayOfWeek = tempDate.getDay();
+    
+    // Si cae en sábado (6), mover a viernes (5)
+    if (dayOfWeek === 6) {
+      dayInMonth = dayInMonth - 1;
+    } 
+    // Si cae en domingo (0), mover a viernes (5)
+    else if (dayOfWeek === 0) {
+      dayInMonth = dayInMonth - 2;
+    }
+    
+    return dayInMonth;
+  };
+
+  // Usar el pago calculado o permitir entrada manual
+  const effectivePaymentDueDay = paymentDueDay || calculatePaymentDueDay();
+
+  // Función para obtener los días de cualquier mes
+  const getMonthDays = (month, year) => {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startingDayOfWeek, month, year };
+  };
+
+  // Función para obtener el nombre del mes
+  const getMonthName = (month) => {
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return months[month];
+  };
+
+  // Función para formatear la fecha en formato DD MMM AAAA
+  const formatDate = (day, month, year) => {
+    if (!day) return '';
+    const monthName = getMonthName(month);
+    return `${String(day).padStart(2, '0')} ${monthName.substring(0, 3)} ${year}`;
+  };
+
+  // Función para formatear montos al formato RD$XXX,XXX.XX
+  const formatCurrency = (value) => {
+    if (!value && value !== 0) return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '';
+    return `RD$${num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  // Función para parsear montos desde formato RD$XXX,XXX.XX
+  const parseCurrency = (value) => {
+    if (!value) return 0;
+    // Remover "RD$", espacios y puntos de miles
+    const cleaned = value.replace(/RD\$|[\s.]/g, '').replace(',', '.');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
 
   const getFinancialTips = () => {
     const debtRatio = (balance / creditLimit) * 100;
@@ -100,6 +188,35 @@ export default function CreditCardPlanner() {
         graduatedPlan.push(Math.max(payment, minPayment).toFixed(2));
         remainingBalance -= (payment - interest);
       }
+      
+      // Ajustar el último pago para que saldar exactamente o con margen de 0.10
+      let testBalance = balance;
+      let totalInterest = totalInterestPaid;
+      for (let i = 0; i < planMonths; i++) {
+        const payment = parseFloat(graduatedPlan[i]);
+        const interest = testBalance * monthlyRate;
+        const principal = payment - interest;
+        testBalance = Math.max(testBalance - principal, 0);
+        totalInterest += interest;
+      }
+      
+      // Si queda remanente, ajustarlo en el último pago
+      if (testBalance > 0.10) {
+        let adjustedBalance = balance;
+        let adjustedInterest = totalInterestPaid;
+        for (let i = 0; i < planMonths - 1; i++) {
+          const payment = parseFloat(graduatedPlan[i]);
+          const interest = adjustedBalance * monthlyRate;
+          const principal = payment - interest;
+          adjustedBalance -= principal;
+          adjustedInterest += interest;
+        }
+        // Último pago debe ser suficiente para pagar el balance + interés
+        const lastInterest = adjustedBalance * monthlyRate;
+        const lastPayment = adjustedBalance + lastInterest;
+        graduatedPlan[planMonths - 1] = lastPayment.toFixed(2);
+      }
+      
       setPaymentPlan(graduatedPlan);
     }
   };
@@ -175,7 +292,6 @@ export default function CreditCardPlanner() {
 
   const resetSimulation = () => {
     setGameState('setup');
-    setBalance(0);
     setTotalInterestPaid(0);
     setAchievements([]);
     setShowWarning(false);
@@ -275,71 +391,241 @@ export default function CreditCardPlanner() {
             <div className="bg-indigo-50 rounded-lg p-6 mb-6 space-y-6">
               <h2 className="font-semibold text-lg mb-4">Configuración de tu Tarjeta</h2>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Día de Corte</label>
-                  <input
-                    type="number"
-                    value={cutoffDay}
-                    onChange={(e) => setCutoffDay(e.target.value === '' ? '' : Math.max(1, Math.min(28, parseInt(e.target.value))))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    min="1"
-                    max="28"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={cutoffDay}
+                      onChange={(e) => setCutoffDay(e.target.value === '' ? '' : Math.max(1, Math.min(28, parseInt(e.target.value))))}
+                      onClick={() => setShowCutoffCalendar(!showCutoffCalendar)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      min="1"
+                      max="28"
+                      placeholder="Seleccionar día"
+                    />
+                    <Calendar className="absolute right-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
+                    {showCutoffCalendar && (
+                      <div className="absolute top-full left-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-20 p-3 w-72">
+                        {(() => {
+                          const { daysInMonth, startingDayOfWeek } = getMonthDays(cutoffCalendarMonth, cutoffCalendarYear);
+                          const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+                          const calendarDays = [];
+                          
+                          for (let i = 0; i < startingDayOfWeek; i++) {
+                            calendarDays.push(null);
+                          }
+                          for (let i = 1; i <= Math.min(daysInMonth, 28); i++) {
+                            calendarDays.push(i);
+                          }
+                          
+                          return (
+                            <div>
+                              <div className="flex justify-between items-center mb-2">
+                                <button
+                                  onClick={() => {
+                                    setCutoffCalendarMonth(cutoffCalendarMonth === 0 ? 11 : cutoffCalendarMonth - 1);
+                                    setCutoffCalendarYear(cutoffCalendarMonth === 0 ? cutoffCalendarYear - 1 : cutoffCalendarYear);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900 text-lg"
+                                >
+                                  ◀
+                                </button>
+                                <p className="text-xs text-gray-700 font-semibold text-center flex-1">
+                                  {getMonthName(cutoffCalendarMonth)} {cutoffCalendarYear}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    setCutoffCalendarMonth(cutoffCalendarMonth === 11 ? 0 : cutoffCalendarMonth + 1);
+                                    setCutoffCalendarYear(cutoffCalendarMonth === 11 ? cutoffCalendarYear + 1 : cutoffCalendarYear);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900 text-lg"
+                                >
+                                  ▶
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-7 gap-0.5 text-center text-xs font-bold text-gray-600 mb-1">
+                                {dayNames.map(day => <div key={day}>{day}</div>)}
+                              </div>
+                              <div className="grid grid-cols-7 gap-0.5">
+                                {calendarDays.map((day, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      if (day) {
+                                        setCutoffDay(day.toString());
+                                        setShowCutoffCalendar(false);
+                                      }
+                                    }}
+                                    className={`w-7 h-7 rounded text-xs ${
+                                      day === null
+                                        ? 'bg-transparent'
+                                        : parseInt(cutoffDay) === day
+                                        ? 'bg-indigo-600 text-white font-bold'
+                                        : 'bg-gray-100 hover:bg-indigo-100'
+                                    }`}
+                                    disabled={day === null}
+                                  >
+                                    {day}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-500 mt-1">Día del mes (1-28)</div>
                 </div>
+                
                 <div>
-                  <label className="block text-sm font-medium mb-2">Día Límite de Pago</label>
+                  <label className="block text-sm font-medium mb-2">Días para Pagar</label>
                   <input
                     type="number"
-                    value={paymentDueDay}
-                    onChange={(e) => setPaymentDueDay(e.target.value === '' ? '' : Math.max(1, Math.min(31, parseInt(e.target.value))))}
+                    value={daysToPayInput}
+                    onChange={(e) => setDaysToPayInput(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value)))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    min="1"
-                    max="31"
+                    min="0"
+                    placeholder="¿Cuántos días?"
                   />
-                  <div className="text-sm text-gray-500 mt-1">Día del mes siguiente</div>
+                  <div className="text-sm text-gray-500 mt-1">Días que te da el banco</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Próximo día límite de pago</label>
+                  <div className="relative">
+                    <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 text-sm font-medium">
+                      {paymentDueDay ? formatDate(parseInt(paymentDueDay), paymentCalendarMonth, paymentCalendarYear) : 'Seleccionar día'}
+                    </div>
+                    <Calendar 
+                      onClick={() => setShowPaymentCalendar(!showPaymentCalendar)}
+                      className="absolute right-3 top-3 w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600"
+                    />
+                    {showPaymentCalendar && (
+                      <div className="absolute top-full left-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-20 p-3 w-72">
+                        {(() => {
+                          const { daysInMonth, startingDayOfWeek } = getMonthDays(paymentCalendarMonth, paymentCalendarYear);
+                          const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+                          const calendarDays = [];
+                          
+                          for (let i = 0; i < startingDayOfWeek; i++) {
+                            calendarDays.push(null);
+                          }
+                          for (let i = 1; i <= daysInMonth; i++) {
+                            calendarDays.push(i);
+                          }
+                          
+                          return (
+                            <div>
+                              <div className="flex justify-between items-center mb-2">
+                                <button
+                                  onClick={() => {
+                                    setPaymentCalendarMonth(paymentCalendarMonth === 0 ? 11 : paymentCalendarMonth - 1);
+                                    setPaymentCalendarYear(paymentCalendarMonth === 0 ? paymentCalendarYear - 1 : paymentCalendarYear);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900 text-lg"
+                                >
+                                  ◀
+                                </button>
+                                <p className="text-xs text-gray-700 font-semibold text-center flex-1">
+                                  {getMonthName(paymentCalendarMonth)} {paymentCalendarYear}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    setPaymentCalendarMonth(paymentCalendarMonth === 11 ? 0 : paymentCalendarMonth + 1);
+                                    setPaymentCalendarYear(paymentCalendarMonth === 11 ? paymentCalendarYear + 1 : paymentCalendarYear);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-900 text-lg"
+                                >
+                                  ▶
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-7 gap-0.5 text-center text-xs font-bold text-gray-600 mb-1">
+                                {dayNames.map(day => <div key={day}>{day}</div>)}
+                              </div>
+                              <div className="grid grid-cols-7 gap-0.5">
+                                {calendarDays.map((day, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      if (day) {
+                                        setPaymentDueDay(day.toString());
+                                        setShowPaymentCalendar(false);
+                                      }
+                                    }}
+                                    className={`w-7 h-7 rounded text-xs ${
+                                      day === null
+                                        ? 'bg-transparent'
+                                        : parseInt(paymentDueDay) === day
+                                        ? 'bg-indigo-600 text-white font-bold'
+                                        : 'bg-gray-100 hover:bg-indigo-100'
+                                    }`}
+                                    disabled={day === null}
+                                  >
+                                    {day}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {paymentDueDay ? 'Seleccionado manualmente' : 'Seleccionar día'}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Límite de Crédito</label>
-                  <input
-                    type="number"
-                    value={creditLimit || ''}
-                    onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-gray-500 font-medium">RD$</span>
+                    <input
+                      type="number"
+                      value={creditLimit || ''}
+                      onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="0.00"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Balance Actual</label>
-                  <input
-                    type="number"
-                    value={balance || ''}
-                    onChange={(e) => setBalance(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-3 text-gray-500 font-medium">RD$</span>
+                    <input
+                      type="number"
+                      value={balance || ''}
+                      onChange={(e) => setBalance(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="0.00"
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                   {balance > creditLimit && (
                     <div className="text-sm text-red-600 mt-1 font-medium">
-                      ⚠️ Sobregiro: ${(balance - creditLimit).toFixed(2)}
+                      ⚠️ Sobregiro: RD${(balance - creditLimit).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="mt-4">
-                <label className="block text-sm font-medium mb-2">Tasa de Interés Mensual (%)</label>
-                <input
-                  type="number"
-                  value={(monthlyRate * 100).toFixed(2)}
-                  onChange={(e) => setMonthlyRate(Math.max(0, parseFloat(e.target.value) || 0) / 100)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  step="0.1"
-                />
-                <div className="text-sm text-gray-500 mt-1">
-                  Anual: {annualRate}%
+                <div>
+                  <label className="block text-sm font-medium mb-2">Tasa de Interés (%)</label>
+                  <input
+                    type="number"
+                    value={(monthlyRate * 100).toFixed(2)}
+                    onChange={(e) => setMonthlyRate(Math.max(0, parseFloat(e.target.value) || 0) / 100)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    step="0.1"
+                  />
+                  <div className="text-sm text-gray-500 mt-1">
+                    Anual: {annualRate}%
+                  </div>
                 </div>
               </div>
             </div>
@@ -347,8 +633,9 @@ export default function CreditCardPlanner() {
             <div className="bg-blue-100 border-2 border-blue-500 rounded-lg p-5 mb-6 shadow-md">
               <h3 className="font-bold text-blue-900 mb-3 text-base">📋 Resumen</h3>
               <div className="text-sm text-blue-900 space-y-2 font-medium">
-                <div>• Límite: ${creditLimit.toLocaleString()} • Balance: ${balance.toFixed(2)}</div>
-                <div>• Tasa: {annualRate}% anual • Corte: día {cutoffDay || '-'} • Límite pago: día {paymentDueDay || '-'}</div>
+                <div>• Límite: {formatCurrency(creditLimit)} • Balance: {formatCurrency(balance)}</div>
+                <div>• Tasa: {annualRate}% anual • Corte: día {cutoffDay || '-'}</div>
+                <div>• Días para pagar: {daysToPayInput || '-'} • Límite pago: día {effectivePaymentDueDay || '-'}</div>
               </div>
             </div>
 
@@ -373,14 +660,22 @@ export default function CreditCardPlanner() {
               <CreditCard className="w-8 h-8 text-indigo-600" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-800">Planificador de Pagos</h1>
-                <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+              <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                   <span>📅 Corte: día {cutoffDay}</span>
-                  <span className="text-red-600 font-semibold">⏰ Límite pago: día {paymentDueDay}</span>
+                  <span>⏳ Días para pagar: {daysToPayInput}</span>
+                  <span className="text-red-600 font-semibold">⏰ Límite pago: día {effectivePaymentDueDay}</span>
                 </div>
               </div>
             </div>
             
             <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={resetSimulation}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span className="hidden sm:inline">Inicio</span>
+              </button>
               <button
                 onClick={downloadPaymentPlan}
                 className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
@@ -395,13 +690,6 @@ export default function CreditCardPlanner() {
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Config</span>
               </button>
-              <button
-                onClick={resetSimulation}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span className="hidden sm:inline">Reiniciar</span>
-              </button>
             </div>
           </div>
 
@@ -410,14 +698,17 @@ export default function CreditCardPlanner() {
               <h3 className="font-semibold text-lg mb-4">Configuración Actual</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Límite de Crédito ($)</label>
-                  <input
-                    type="number"
-                    value={creditLimit}
-                    onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    min="0"
-                  />
+                  <label className="block text-sm font-medium mb-2">Límite de Crédito</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500 font-medium text-sm">RD$</span>
+                    <input
+                      type="number"
+                      value={creditLimit}
+                      onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      min="0"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
@@ -443,22 +734,22 @@ export default function CreditCardPlanner() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Balance Actual</div>
-              <div className="text-xl font-bold">${balance.toFixed(2)}</div>
+              <div className="text-xl font-bold">{formatCurrency(balance)}</div>
               <div className="text-xs opacity-75 mt-1">{creditLimit > 0 ? ((balance / creditLimit) * 100).toFixed(1) : '0'}% {balance > creditLimit ? 'sobregiro' : 'usado'}</div>
             </div>
             <div className={`bg-gradient-to-br rounded-lg p-4 text-white ${availableCredit >= 0 ? 'from-green-500 to-emerald-600' : 'from-red-600 to-red-700'}`}>
               <div className="text-xs opacity-90 mb-1">{availableCredit >= 0 ? 'Crédito Disponible' : '🚨 Sobregiro'}</div>
-              <div className="text-xl font-bold">${Math.abs(availableCredit).toFixed(2)}</div>
-              <div className="text-xs opacity-75 mt-1">{availableCredit >= 0 ? `de $${creditLimit}` : 'excedido'}</div>
+              <div className="text-xl font-bold">{formatCurrency(Math.abs(availableCredit))}</div>
+              <div className="text-xs opacity-75 mt-1">{availableCredit >= 0 ? `de ${formatCurrency(creditLimit)}` : 'excedido'}</div>
             </div>
             <div className="bg-gradient-to-br from-red-500 to-pink-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Intereses Totales</div>
-              <div className="text-xl font-bold">${planProjection[planProjection.length - 1]?.totalInterest.toFixed(2) || '0.00'}</div>
+              <div className="text-xl font-bold">{formatCurrency(planProjection[planProjection.length - 1]?.totalInterest || 0)}</div>
               <div className="text-xs opacity-75 mt-1">proyectados</div>
             </div>
             <div className="bg-gradient-to-br from-orange-500 to-yellow-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Pago Mínimo</div>
-              <div className="text-xl font-bold">${minPayment.toFixed(2)}</div>
+              <div className="text-xl font-bold">{formatCurrency(minPayment)}</div>
               <div className="text-xs opacity-75 mt-1">5% del balance</div>
             </div>
           </div>
@@ -470,7 +761,7 @@ export default function CreditCardPlanner() {
                 <div>
                   <h3 className="font-semibold text-amber-900">Aviso Importante</h3>
                   <p className="text-sm text-amber-800 mt-1">
-                    Estos cálculos son estimados y no incluyen cargos extras aplicables como sobregiros, anualidades, cargos por financiamiento, etc. Consulta con tu banco para obtener información completa.
+                    Cálculos estimados sujetos a variación según la entidad financiera. Consulta con tu banco para más información.
                   </p>
                 </div>
               </div>
@@ -501,6 +792,7 @@ export default function CreditCardPlanner() {
                 <div key={index} className="flex flex-col relative">
                   <label className="text-xs font-medium text-gray-600 mb-1">Mes {index + 1}</label>
                   <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-500 font-medium text-xs">RD$</span>
                     <input
                       type="number"
                       value={payment}
@@ -509,45 +801,11 @@ export default function CreditCardPlanner() {
                         newPlan[index] = e.target.value;
                         setPaymentPlan(newPlan);
                       }}
-                      className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="$0"
+                      className="w-full pl-8 pr-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="0.00"
                       min="0"
                     />
-                    <button
-                      onClick={() => setShowCellMenu(showCellMenu === index ? null : index)}
-                      className="absolute right-0 top-0 h-full px-2 text-gray-500 hover:text-indigo-600"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
                   </div>
-                  {showCellMenu === index && (
-                    <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 whitespace-nowrap text-xs">
-                      <button
-                        onClick={() => fillCellWithPercentage(index, 25)}
-                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
-                      >
-                        Mín +25%
-                      </button>
-                      <button
-                        onClick={() => fillCellWithPercentage(index, 50)}
-                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
-                      >
-                        Mín +50%
-                      </button>
-                      <button
-                        onClick={() => fillCellWithPercentage(index, 75)}
-                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
-                      >
-                        Mín +75%
-                      </button>
-                      <button
-                        onClick={() => fillCellWithPercentage(index, 100)}
-                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
-                      >
-                        Doble Mín
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -583,14 +841,42 @@ export default function CreditCardPlanner() {
               <p className="text-sm text-gray-600">Visualiza cómo evoluciona tu balance y los intereses acumulados mes a mes según tus pagos. Los gráficos muestran el progreso hacia la eliminación de tu deuda.</p>
             </div>
             
-            {planProjection[planMonths - 1]?.balance > 0 && (
+            {planProjection[planMonths - 1]?.balance > 0.10 && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
                 <div className="flex gap-3">
                   <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-red-900">⚠️ Estos pagos no son suficientes</h3>
+                    <h3 className="font-semibold text-red-900">💪 Casi lo logras, pero falta dinero</h3>
                     <p className="text-sm text-red-800 mt-1">
-                      Estos pagos no son suficientes para saldar el monto total adeudado en el tiempo establecido. Al finalizar el mes {planMonths}, aún quedaría un saldo de ${planProjection[planMonths - 1]?.balance.toFixed(2)}.
+                      No es suficiente para saldar en el tiempo establecido. Aún quedaría un saldo de {formatCurrency(planProjection[planMonths - 1]?.balance)}. ¡Aumenta tus pagos un poco más para lograrlo!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {planProjection[planMonths - 1]?.balance <= 0.10 && planProjection[planMonths - 1]?.balance > 0 && (
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-green-900">✅ ¡Plan suficiente!</h3>
+                    <p className="text-sm text-green-800 mt-1">
+                      Tu plan es suficiente para saldar el monto en el tiempo establecido. ¡Excelente trabajo! Con estos pagos, lograrás tu objetivo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {planProjection[planMonths - 1]?.balance <= 0 && (
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-green-900">🎉 ¡Plan completado!</h3>
+                    <p className="text-sm text-green-800 mt-1">
+                      Tu plan es más que suficiente para saldar tu deuda en el tiempo establecido. ¡Felicidades, estás en el camino correcto!
                     </p>
                   </div>
                 </div>
@@ -604,7 +890,7 @@ export default function CreditCardPlanner() {
                   <div>
                     <h3 className="font-semibold text-red-900">⚠️ Advertencia de Pago Bajo</h3>
                     <p className="text-sm text-red-800 mt-1">
-                      Algunos de tus pagos están por debajo del pago mínimo recomendado (${minPayment.toFixed(2)}). Esto causará que los intereses aumenten significativamente.
+                      Algunos de tus pagos están por debajo del pago mínimo recomendado ({formatCurrency(minPayment)}). Esto causará que los intereses aumenten significativamente.
                     </p>
                   </div>
                 </div>
@@ -635,9 +921,9 @@ export default function CreditCardPlanner() {
                         return (
                           <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
                             <p className="font-semibold">Mes {data.month} {data.emoji}</p>
-                            <p className="text-sm">Pago: ${data.payment.toFixed(2)}</p>
-                            <p className="text-sm">Balance: ${data.balance.toFixed(2)}</p>
-                            <p className="text-sm">Intereses: ${data.interest.toFixed(2)}</p>
+                            <p className="text-sm">Pago: {formatCurrency(data.payment)}</p>
+                            <p className="text-sm">Balance: {formatCurrency(data.balance)}</p>
+                            <p className="text-sm">Intereses: {formatCurrency(data.interest)}</p>
                           </div>
                         );
                       }
@@ -664,16 +950,16 @@ export default function CreditCardPlanner() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-gray-200 rounded-lg p-4 bg-green-50">
                   <div className="font-medium mb-3">Pago Recomendado (Mínimo + 50%)</div>
-                  <div className="text-sm text-gray-700 mb-2">Pago mensual: <span className="font-semibold">${(minPayment * 1.5).toFixed(2)}</span></div>
+                  <div className="text-sm text-gray-700 mb-2">Pago mensual: <span className="font-semibold">{formatCurrency(minPayment * 1.5)}</span></div>
                   <div className="text-sm text-gray-600">
                     • Tiempo: <span className="font-semibold">{recommendedProjection.months === Infinity ? '∞' : recommendedProjection.months} meses</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    • Intereses totales: <span className="font-semibold text-green-600">${recommendedProjection.totalInterest.toFixed(2)}</span>
+                    • Intereses totales: <span className="font-semibold text-green-600">{formatCurrency(recommendedProjection.totalInterest)}</span>
                   </div>
                   {minProjection.months !== Infinity && (
                     <div className="text-xs font-semibold text-green-700 mt-2">
-                      ✓ Ahorras ${(minProjection.totalInterest - recommendedProjection.totalInterest).toFixed(2)} vs pago mínimo
+                      ✓ Ahorras {formatCurrency(minProjection.totalInterest - recommendedProjection.totalInterest)} vs pago mínimo
                     </div>
                   )}
                 </div>
@@ -682,26 +968,32 @@ export default function CreditCardPlanner() {
                   <div className="font-medium mb-3">Pago Personalizado</div>
                   <div className="space-y-2 mb-3">
                     <div>
-                      <label className="block text-xs font-medium mb-1">Pago mensual ($)</label>
-                      <input
-                        type="number"
-                        value={customPayment}
-                        onChange={(e) => setCustomPayment(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Ej: 150"
-                        min={minPayment}
-                      />
+                      <label className="block text-xs font-medium mb-1">Pago mensual</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500 font-medium text-xs">RD$</span>
+                        <input
+                          type="number"
+                          value={customPayment}
+                          onChange={(e) => setCustomPayment(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="0.00"
+                          min={minPayment}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">Aporte adicional mensual ($)</label>
-                      <input
-                        type="number"
-                        value={additionalPayment}
-                        onChange={(e) => setAdditionalPayment(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Ej: 50"
-                        min="0"
-                      />
+                      <label className="block text-xs font-medium mb-1">Aporte adicional mensual</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-gray-500 font-medium text-xs">RD$</span>
+                        <input
+                          type="number"
+                          value={additionalPayment}
+                          onChange={(e) => setAdditionalPayment(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          placeholder="0.00"
+                          min="0"
+                        />
+                      </div>
                     </div>
                   </div>
                   {customProjection.months > 0 && (
@@ -710,11 +1002,11 @@ export default function CreditCardPlanner() {
                         • Tiempo: <span className="font-semibold">{customProjection.months === Infinity ? '∞' : customProjection.months} meses</span>
                       </div>
                       <div className="text-sm text-gray-600">
-                        • Intereses totales: <span className="font-semibold text-indigo-600">${customProjection.totalInterest.toFixed(2)}</span>
+                        • Intereses totales: <span className="font-semibold text-indigo-600">{formatCurrency(customProjection.totalInterest)}</span>
                       </div>
                       {minProjection.months !== Infinity && (
                         <div className="text-xs font-semibold text-indigo-700 mt-2">
-                          ✓ Ahorras ${(minProjection.totalInterest - customProjection.totalInterest).toFixed(2)} vs pago mínimo
+                          ✓ Ahorras {formatCurrency(minProjection.totalInterest - customProjection.totalInterest)} vs pago mínimo
                         </div>
                       )}
                     </div>
