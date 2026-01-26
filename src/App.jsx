@@ -7,7 +7,7 @@ import html2pdf from 'html2pdf.js';
 export default function CreditCardPlanner() {
   const [gameState, setGameState] = useState('setup');
   const [balance, setBalance] = useState(0);
-  const [creditLimit, setCreditLimit] = useState(1000);
+  const [creditLimit, setCreditLimit] = useState(0);
   const [monthlyRate, setMonthlyRate] = useState(0.05);
   const [totalInterestPaid, setTotalInterestPaid] = useState(0);
   const [achievements, setAchievements] = useState([]);
@@ -18,11 +18,11 @@ export default function CreditCardPlanner() {
   const [customPayment, setCustomPayment] = useState('');
   const [additionalPayment, setAdditionalPayment] = useState('');
   
-  const [cutoffDay, setCutoffDay] = useState('15');
-  const [paymentDueDay, setPaymentDueDay] = useState('25');
+  const [cutoffDay, setCutoffDay] = useState('');
+  const [paymentDueDay, setPaymentDueDay] = useState('');
   
-  const [planMonths, setPlanMonths] = useState(12);
-  const [paymentPlan, setPaymentPlan] = useState(Array(12).fill(''));
+  const [planMonths, setPlanMonths] = useState(6);
+  const [paymentPlan, setPaymentPlan] = useState(Array(6).fill(''));
   const chartRef = useRef(null);
 
   const minPayment = Math.max(balance * 0.05, 25);
@@ -180,8 +180,8 @@ export default function CreditCardPlanner() {
     setAchievements([]);
     setShowWarning(false);
     setShowSettings(false);
-    setPlanMonths(12);
-    setPaymentPlan(Array(12).fill(''));
+    setPlanMonths(6);
+    setPaymentPlan(Array(6).fill(''));
   };
 
   const startSimulation = () => {
@@ -281,7 +281,7 @@ export default function CreditCardPlanner() {
                   <input
                     type="number"
                     value={cutoffDay}
-                    onChange={(e) => setCutoffDay(Math.max(1, Math.min(28, parseInt(e.target.value) || 15)))}
+                    onChange={(e) => setCutoffDay(e.target.value === '' ? '' : Math.max(1, Math.min(28, parseInt(e.target.value))))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     min="1"
                     max="28"
@@ -293,7 +293,7 @@ export default function CreditCardPlanner() {
                   <input
                     type="number"
                     value={paymentDueDay}
-                    onChange={(e) => setPaymentDueDay(Math.max(1, Math.min(31, parseInt(e.target.value) || 25)))}
+                    onChange={(e) => setPaymentDueDay(e.target.value === '' ? '' : Math.max(1, Math.min(31, parseInt(e.target.value))))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     min="1"
                     max="31"
@@ -302,18 +302,34 @@ export default function CreditCardPlanner() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Límite de Crédito ($)</label>
-                <input
-                  type="number"
-                  value={creditLimit}
-                  onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Ej: 1000"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Límite de Crédito ($)</label>
+                  <input
+                    type="number"
+                    value={creditLimit || ''}
+                    onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Balance Actual ($)</label>
+                  <input
+                    type="number"
+                    value={balance || ''}
+                    onChange={(e) => setBalance(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                  {balance > creditLimit && (
+                    <div className="text-sm text-red-600 mt-1 font-medium">
+                      ⚠️ Sobregiro: ${(balance - creditLimit).toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div>
+              <div className="mt-4">
                 <label className="block text-sm font-medium mb-2">Tasa de Interés Mensual (%)</label>
                 <input
                   type="number"
@@ -323,24 +339,8 @@ export default function CreditCardPlanner() {
                   step="0.1"
                 />
                 <div className="text-sm text-gray-500 mt-1">
-                  Tasa anual: {annualRate}%
+                  Anual: {annualRate}%
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Balance Inicial ($)</label>
-                <input
-                  type="number"
-                  value={balance || ''}
-                  onChange={(e) => setBalance(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Ej: 1000"
-                />
-                {balance > creditLimit && (
-                  <div className="text-sm text-red-600 mt-1 font-medium">
-                    ⚠️ Sobregiro: ${(balance - creditLimit).toFixed(2)}
-                  </div>
-                )}
               </div>
             </div>
 
