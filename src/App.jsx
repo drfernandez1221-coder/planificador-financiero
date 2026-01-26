@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { CreditCard, TrendingUp, AlertCircle, Trophy, DollarSign, RotateCcw, ShoppingCart, Settings, Calendar, Download, FileText } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { CreditCard, TrendingUp, AlertCircle, Trophy, DollarSign, RotateCcw, ShoppingCart, Settings, Calendar, Download, FileText, Lightbulb, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import html2pdf from 'html2pdf.js';
 
 export default function CreditCardPlanner() {
   const [gameState, setGameState] = useState('setup');
@@ -12,6 +13,7 @@ export default function CreditCardPlanner() {
   const [achievements, setAchievements] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCellMenu, setShowCellMenu] = useState(null);
   
   const [customPayment, setCustomPayment] = useState('');
   const [additionalPayment, setAdditionalPayment] = useState('');
@@ -20,10 +22,96 @@ export default function CreditCardPlanner() {
   const [paymentDueDay, setPaymentDueDay] = useState('25');
   
   const [paymentPlan, setPaymentPlan] = useState(Array(12).fill(''));
+  const chartRef = useRef(null);
 
   const minPayment = Math.max(balance * 0.05, 25);
   const availableCredit = creditLimit - balance;
   const annualRate = (monthlyRate * 12 * 100).toFixed(1);
+
+  const getFinancialTips = () => {
+    const debtRatio = (balance / creditLimit) * 100;
+    
+    if (debtRatio >= 80) {
+      return {
+        severity: 'critical',
+        icon: '🚨',
+        title: 'Deuda Muy Alta',
+        tips: [
+          '• Tu deuda está muy alta. Es momento de actuar rápidamente.',
+          '• Considera hacer pagos extras si es posible para reducir intereses.',
+          '• Evita nuevas compras hasta reducir el balance significativamente.',
+          '• Si no puedes pagar, contacta a tu banco para negociar opciones.'
+        ]
+      };
+    } else if (debtRatio >= 50) {
+      return {
+        severity: 'warning',
+        icon: '⚠️',
+        title: 'Deuda Moderada',
+        tips: [
+          '• Tu deuda está en nivel moderado. Necesitas un plan firme.',
+          '• Intenta pagar más que el mínimo cada mes.',
+          '• Calcula cuánto pagarías en intereses vs pago mínimo.',
+          '• Limita nuevas compras hasta saldar la deuda.'
+        ]
+      };
+    } else if (debtRatio > 0) {
+      return {
+        severity: 'info',
+        icon: 'ℹ️',
+        title: 'Deuda Manejable',
+        tips: [
+          '• Tu deuda está bajo control. ¡Así se hace!',
+          '• Sigue pagando regularmente para evitar acumular intereses.',
+          '• Un pago adicional mensual aceleraría tu liberación de deuda.',
+          '• Mantén tu utilización de crédito por debajo del 30%.'
+        ]
+      };
+    } else {
+      return {
+        severity: 'success',
+        icon: '✅',
+        title: 'Sin Deudas',
+        tips: [
+          '• ¡Felicidades! No tienes deuda en la tarjeta.',
+          '• Usa tu tarjeta de crédito responsablemente.',
+          '• Paga el saldo completo cada mes para evitar intereses.',
+          '• Construye un historial crediticio sólido.'
+        ]
+      };
+    }
+  };
+
+  const autoFillPaymentPlan = (type) => {
+    const newPlan = [...paymentPlan];
+    
+    if (type === 'minimum') {
+      // Llenar con pago mínimo
+      const newPlan = Array(12).fill(minPayment.toFixed(2));
+      setPaymentPlan(newPlan);
+    } else if (type === 'graduated') {
+      // Pagos escalonados para saldar en un año
+      let remainingBalance = balance;
+      const graduatedPlan = [];
+      
+      for (let i = 0; i < 12; i++) {
+        const monthsLeft = 12 - i;
+        const interest = remainingBalance * monthlyRate;
+        const payment = (remainingBalance + interest) / monthsLeft;
+        graduatedPlan.push(Math.max(payment, minPayment).toFixed(2));
+        remainingBalance -= (payment - interest);
+      }
+      setPaymentPlan(graduatedPlan);
+    }
+  };
+
+  const fillCellWithPercentage = (cellIndex, percentage) => {
+    const newPlan = [...paymentPlan];
+    const cellPayment = minPayment * (1 + percentage / 100);
+    newPlan[cellIndex] = cellPayment.toFixed(2);
+    setPaymentPlan(newPlan);
+    setShowCellMenu(null);
+  };
 
   const calculatePlanProjection = () => {
     const projection = [];
@@ -153,37 +241,21 @@ export default function CreditCardPlanner() {
   };
 
   const downloadPaymentPlan = () => {
-    const plan = generatePaymentPlan();
-    const content = `PLAN DE PAGOS RECOMENDADO - TARJETA DE CRÉDITO
+    const element = document.getElementById('pdf-content');
+    if (!element) {
+      alert('No se puede generar el PDF. Intenta nuevamente.');
+      return;
+    }
 
-📅 Fecha de generación: ${new Date().toLocaleDateString('es-DO')}
-💳 Balance actual: $${plan.balance.toFixed(2)}
-💰 Pago recomendado mensual: $${plan.recommendedPayment}
-⏱️ Meses estimados: ${plan.months}
-💸 Intereses totales estimados: $${plan.totalInterest}
-📉 Ahorro mensual vs mínimo: $${plan.monthlySavings}
+    const opt = {
+      margin: 10,
+      filename: `plan_pagos_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    };
 
-DETALLES DE CONFIGURACIÓN:
-• Límite de crédito: $${creditLimit.toLocaleString()}
-• Tasa anual: ${annualRate}%
-• Día de corte: ${cutoffDay}
-• Día límite de pago: ${paymentDueDay}
-
-RECOMENDACIONES:
-✅ Paga $${plan.recommendedPayment} mensualmente
-✅ Evita nuevas compras hasta saldar la deuda
-✅ Marca cada pago en tu calendario
-✅ Revisa tu estado de cuenta cada mes
-
-¡Sigue este plan y saldrás de deudas más rápido y con menos intereses!`;
-    
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `plan_pagos_${new Date().toISOString().split('T')[0]}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    html2pdf().set(opt).from(element).save();
   };
 
   if (gameState === 'setup') {
@@ -260,10 +332,15 @@ RECOMENDACIONES:
                 <input
                   type="number"
                   value={balance || ''}
-                  onChange={(e) => setBalance(Math.max(0, Math.min(creditLimit, parseFloat(e.target.value) || 0)))}
+                  onChange={(e) => setBalance(Math.max(0, parseFloat(e.target.value) || 0))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  max={creditLimit}
+                  placeholder="Ej: 1000"
                 />
+                {balance > creditLimit && (
+                  <div className="text-sm text-red-600 mt-1 font-medium">
+                    ⚠️ Sobregiro: ${(balance - creditLimit).toFixed(2)}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -277,7 +354,7 @@ RECOMENDACIONES:
 
             <button
               onClick={startSimulation}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-bold text-lg hover:from-indigo-700 hover:to-purple-700 transition shadow-lg"
             >
               🚀 Comenzar Simulación
             </button>
@@ -337,9 +414,9 @@ RECOMENDACIONES:
                   <input
                     type="number"
                     value={creditLimit}
-                    onChange={(e) => setCreditLimit(Math.max(balance, parseFloat(e.target.value) || 0))}
+                    onChange={(e) => setCreditLimit(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    min={balance}
+                    min="0"
                   />
                 </div>
                 <div>
@@ -367,12 +444,12 @@ RECOMENDACIONES:
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Balance Actual</div>
               <div className="text-xl font-bold">${balance.toFixed(2)}</div>
-              <div className="text-xs opacity-75 mt-1">{((balance / creditLimit) * 100).toFixed(1)}% usado</div>
+              <div className="text-xs opacity-75 mt-1">{creditLimit > 0 ? ((balance / creditLimit) * 100).toFixed(1) : '0'}% {balance > creditLimit ? 'sobregiro' : 'usado'}</div>
             </div>
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg p-4 text-white">
-              <div className="text-xs opacity-90 mb-1">Crédito Disponible</div>
-              <div className="text-xl font-bold">${availableCredit.toFixed(2)}</div>
-              <div className="text-xs opacity-75 mt-1">de ${creditLimit}</div>
+            <div className={`bg-gradient-to-br rounded-lg p-4 text-white ${availableCredit >= 0 ? 'from-green-500 to-emerald-600' : 'from-red-600 to-red-700'}`}>
+              <div className="text-xs opacity-90 mb-1">{availableCredit >= 0 ? 'Crédito Disponible' : '🚨 Sobregiro'}</div>
+              <div className="text-xl font-bold">${Math.abs(availableCredit).toFixed(2)}</div>
+              <div className="text-xs opacity-75 mt-1">{availableCredit >= 0 ? `de $${creditLimit}` : 'excedido'}</div>
             </div>
             <div className="bg-gradient-to-br from-red-500 to-pink-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Intereses Totales</div>
@@ -387,80 +464,160 @@ RECOMENDACIONES:
           </div>
 
           <div className="mb-6">
-            <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
+              <div className="flex gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-amber-900">Aviso Importante</h3>
+                  <p className="text-sm text-amber-800 mt-1">
+                    Estos cálculos son estimados y no incluyen cargos extras aplicables como sobregiros, anualidades, cargos por financiamiento, etc. Consulta con tu banco para obtener información completa.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
               <Calendar className="w-5 h-5" />
               Plan de Pagos (12 meses)
             </h3>
-            <div className="grid grid-cols-6 gap-2">
+            
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-4">
               {paymentPlan.map((payment, index) => (
-                <div key={index} className="flex flex-col">
-                  <label className="text-xs font-medium text-gray-600 mb-1">Mes {index + 1}</label>
-                  <input
-                    type="number"
-                    value={payment}
-                    onChange={(e) => updatePaymentPlan(index, e.target.value)}
-                    className="px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="$0"
-                    min="0"
-                  />
+                <div key={index} className="flex flex-col relative">
+                  <label className="text-xs font-medium text-gray-600 mb-1">M{index + 1}</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={payment}
+                      onChange={(e) => {
+                        const newPlan = [...paymentPlan];
+                        newPlan[index] = e.target.value;
+                        setPaymentPlan(newPlan);
+                      }}
+                      className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="$0"
+                      min="0"
+                    />
+                    <button
+                      onClick={() => setShowCellMenu(showCellMenu === index ? null : index)}
+                      className="absolute right-0 top-0 h-full px-2 text-gray-500 hover:text-indigo-600"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {showCellMenu === index && (
+                    <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 whitespace-nowrap text-xs">
+                      <button
+                        onClick={() => fillCellWithPercentage(index, 25)}
+                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
+                      >
+                        Mín +25%
+                      </button>
+                      <button
+                        onClick={() => fillCellWithPercentage(index, 50)}
+                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
+                      >
+                        Mín +50%
+                      </button>
+                      <button
+                        onClick={() => fillCellWithPercentage(index, 75)}
+                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
+                      >
+                        Mín +75%
+                      </button>
+                      <button
+                        onClick={() => fillCellWithPercentage(index, 100)}
+                        className="block w-full text-left px-3 py-2 hover:bg-indigo-50 text-gray-700"
+                      >
+                        Doble Mín
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 mt-3">
+
+            <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
               <button
-                onClick={() => setPaymentPlan(Array(12).fill((minPayment * 1.5).toFixed(2)))}
-                className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition text-sm"
+                onClick={() => autoFillPaymentPlan('minimum')}
+                className="flex-1 min-w-[150px] px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm font-medium"
               >
-                Llenar con Recomendado (${(minPayment * 1.5).toFixed(2)})
+                📊 Llenar Mínimo
               </button>
               <button
-                onClick={() => setPaymentPlan(Array(12).fill(''))}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
+                onClick={() => autoFillPaymentPlan('graduated')}
+                className="flex-1 min-w-[150px] px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition text-sm font-medium"
               >
-                Limpiar
+                📈 Pagos Escalonados
+              </button>
+              <button
+                onClick={() => {
+                  setPaymentPlan(Array(12).fill(''));
+                  setShowCellMenu(null);
+                }}
+                className="flex-1 min-w-[150px] px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+              >
+                🗑️ Limpiar
               </button>
             </div>
           </div>
 
           <div className="mb-8">
             <h3 className="font-semibold text-lg mb-4">📊 Proyección del Plan</h3>
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={planProjection}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="month" 
-                  label={{ value: 'Mes', position: 'insideBottom', offset: -5 }}
-                />
-                <YAxis label={{ value: 'Balance ($)', angle: -90, position: 'insideLeft' }} />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-                          <p className="font-semibold">Mes {data.month} {data.emoji}</p>
-                          <p className="text-sm">Pago: ${data.payment.toFixed(2)}</p>
-                          <p className="text-sm">Balance: ${data.balance.toFixed(2)}</p>
-                          <p className="text-sm">Intereses: ${data.interest.toFixed(2)}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2} name="Balance" />
-                <Line type="monotone" dataKey="totalInterest" stroke="#ef4444" strokeWidth={2} name="Intereses Acumulados" />
-              </LineChart>
-            </ResponsiveContainer>
             
-            <div className="flex justify-around mt-2 px-12">
-              {planProjection.slice(0, 12).map((data, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-2xl">{data.emoji}</div>
-                  <div className="text-xs text-gray-500">M{data.month}</div>
+            {planProjection.some(p => p.payment > 0 && p.payment < minPayment * 0.8) && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">⚠️ Advertencia de Pago Bajo</h3>
+                    <p className="text-sm text-red-800 mt-1">
+                      Algunos de tus pagos están por debajo del pago mínimo recomendado (${minPayment.toFixed(2)}). Esto causará que los intereses aumenten significativamente.
+                    </p>
+                  </div>
                 </div>
-              ))}
+              </div>
+            )}
+
+            <div id="pdf-content" className="bg-white p-4 rounded-lg">
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={planProjection} ref={chartRef}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="month" 
+                    label={{ value: 'Mes', position: 'insideBottom', offset: -5 }}
+                  />
+                  <YAxis label={{ value: 'Balance ($)', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
+                            <p className="font-semibold">Mes {data.month} {data.emoji}</p>
+                            <p className="text-sm">Pago: ${data.payment.toFixed(2)}</p>
+                            <p className="text-sm">Balance: ${data.balance.toFixed(2)}</p>
+                            <p className="text-sm">Intereses: ${data.interest.toFixed(2)}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2} name="Balance" />
+                  <Line type="monotone" dataKey="totalInterest" stroke="#ef4444" strokeWidth={2} name="Intereses Acumulados" />
+                </LineChart>
+              </ResponsiveContainer>
+              
+              <div className="flex justify-around mt-4 px-4 flex-wrap gap-2">
+                {planProjection.slice(0, 12).map((data, index) => (
+                  <div key={index} className="text-center">
+                    <div className="text-2xl">{data.emoji}</div>
+                    <div className="text-xs text-gray-500">M{data.month}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -532,6 +689,65 @@ RECOMENDACIONES:
               </div>
             </div>
           )}
+
+          <div className="mb-8">
+            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-yellow-600" />
+              Consejos Financieros
+            </h3>
+            
+            {(() => {
+              const tips = getFinancialTips();
+              return (
+                <div className={`border-l-4 rounded-lg p-5 ${
+                  tips.severity === 'critical' ? 'bg-red-50 border-red-500' :
+                  tips.severity === 'warning' ? 'bg-yellow-50 border-yellow-500' :
+                  tips.severity === 'info' ? 'bg-blue-50 border-blue-500' :
+                  'bg-green-50 border-green-500'
+                }`}>
+                  <h4 className={`font-semibold text-lg mb-3 ${
+                    tips.severity === 'critical' ? 'text-red-900' :
+                    tips.severity === 'warning' ? 'text-yellow-900' :
+                    tips.severity === 'info' ? 'text-blue-900' :
+                    'text-green-900'
+                  }`}>
+                    {tips.icon} {tips.title}
+                  </h4>
+                  <div className={`text-sm space-y-2 ${
+                    tips.severity === 'critical' ? 'text-red-800' :
+                    tips.severity === 'warning' ? 'text-yellow-800' :
+                    tips.severity === 'info' ? 'text-blue-800' :
+                    'text-green-800'
+                  }`}>
+                    {tips.tips.map((tip, index) => (
+                      <p key={index}>{tip}</p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 mb-3">📚 Educación Financiera</h4>
+                <ul className="text-sm text-purple-800 space-y-2">
+                  <li>✓ Paga siempre antes del vencimiento para evitar cargos</li>
+                  <li>✓ Utiliza máximo 30% de tu límite de crédito</li>
+                  <li>✓ Los intereses compuesto aumentan exponencialmente</li>
+                  <li>✓ Cada pago extra reduce significativamente los intereses</li>
+                </ul>
+              </div>
+              <div className="bg-gradient-to-br from-orange-50 to-pink-50 border border-orange-200 rounded-lg p-4">
+                <h4 className="font-semibold text-orange-900 mb-3">💡 Acciones Recomendadas</h4>
+                <ul className="text-sm text-orange-800 space-y-2">
+                  <li>✓ Establece un recordatorio para tus pagos</li>
+                  <li>✓ Intenta pagar más que el mínimo cada mes</li>
+                  <li>✓ Revisa tu estado de cuenta regularmente</li>
+                  <li>✓ Contacta a tu banco si tienes dificultades de pago</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
