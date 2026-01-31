@@ -377,24 +377,27 @@ export default function CreditCardPlanner() {
 
   if (gameState === 'setup') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center gap-3 mb-6">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-6 leading-tight">
+            <div className="flex items-center gap-3 mb-4">
               <CreditCard className="w-10 h-10 text-indigo-600" />
-              <h1 className="text-3xl font-bold text-gray-800">Planificador Financiero</h1>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">Fidu</h1>
+                <div className="text-sm text-gray-600 mt-1">Tu sistema de acompañamiento financiero</div>
+              </div>
             </div>
             
-            <p className="text-gray-600 mb-8">
-              Configura tu tarjeta y simula escenarios de pago para salir de deudas más rápido.
+            <p className="text-gray-600 mb-0">
+              <span className="font-semibold">Configura tu tarjeta y simula escenarios de pago</span>
             </p>
 
-            <div className="bg-indigo-50 rounded-lg p-6 mb-6 space-y-6">
-              <h2 className="font-semibold text-lg mb-4">Configuración de tu Tarjeta</h2>
+            <div className="bg-indigo-50 rounded-lg p-4 mb-2 space-y-2 leading-tight">
+              <h2 className="font-semibold text-lg mb-2">Configuración de tu Tarjeta</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Día de Corte</label>
+                  <label className="block text-sm font-medium mb-1">Día de Corte</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -478,11 +481,11 @@ export default function CreditCardPlanner() {
                       </div>
                     )}
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">Día del mes (1-28)</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Día del mes (1-28)</div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Días para Pagar</label>
+                  <label className="block text-sm font-medium mb-1">Días para Pagar</label>
                   <input
                     type="number"
                     value={daysToPayInput}
@@ -491,11 +494,11 @@ export default function CreditCardPlanner() {
                     min="0"
                     placeholder="¿Cuántos días?"
                   />
-                  <div className="text-sm text-gray-500 mt-1">Días que te da el banco</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Días que te da el banco</div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Próximo día límite de pago</label>
+                  <label className="block text-sm font-medium mb-1">Próximo día límite de pago</label>
                   <div className="relative">
                     <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 text-sm font-medium">
                       {paymentDueDay ? formatDate(parseInt(paymentDueDay), paymentCalendarMonth, paymentCalendarYear) : 'Seleccionar día'}
@@ -575,7 +578,7 @@ export default function CreditCardPlanner() {
                       </div>
                     )}
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-xs text-gray-500 mt-0.5">
                     {paymentDueDay ? 'Seleccionado manualmente' : 'Seleccionar día'}
                   </div>
                 </div>
@@ -583,7 +586,7 @@ export default function CreditCardPlanner() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Límite de Crédito</label>
+                  <label className="block text-sm font-medium mb-1">Límite de Crédito</label>
                   <div className="relative">
                     <span className="absolute left-4 top-3 text-gray-500 font-medium">RD$</span>
                     <input
@@ -597,7 +600,7 @@ export default function CreditCardPlanner() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Balance Actual</label>
+                  <label className="block text-sm font-medium mb-1">Balance Actual</label>
                   <div className="relative">
                     <span className="absolute left-4 top-3 text-gray-500 font-medium">RD$</span>
                     <input
@@ -609,14 +612,14 @@ export default function CreditCardPlanner() {
                     />
                   </div>
                   {balance > creditLimit && (
-                    <div className="text-sm text-red-600 mt-1 font-medium">
+                    <div className="text-xs text-red-600 mt-0.5 font-medium">
                       ⚠️ Sobregiro: RD${(balance - creditLimit).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
+                  <label className="block text-sm font-medium mb-1">Tasa Mensual (%)</label>
                   <input
                     type="number"
                     value={monthlyRateInput}
@@ -626,14 +629,14 @@ export default function CreditCardPlanner() {
                     min="0"
                     placeholder="4.5"
                   />
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-xs text-gray-500 mt-0.5">
                     Anual: {computedAnnualDisplay !== '-' ? `${computedAnnualDisplay}%` : '-'}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-blue-100 border-2 border-blue-500 rounded-lg p-5 mb-6 shadow-md">
+            <div className="bg-blue-100 border-2 border-blue-500 rounded-lg p-3 mb-4 shadow-md">
               <h3 className="font-bold text-blue-900 mb-3 text-base">📋 Resumen</h3>
               <div className="text-sm text-blue-900 space-y-2 font-medium">
                 <div>• Límite: {formatCurrency(creditLimit)} • Balance: {formatCurrency(balance)}</div>
@@ -655,15 +658,16 @@ export default function CreditCardPlanner() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-6 gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-6xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 leading-tight">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-4 gap-3">
             <div className="flex items-center gap-3">
               <CreditCard className="w-8 h-8 text-indigo-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">Planificador de Pagos</h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                <h1 className="text-2xl font-bold text-gray-800">Fidu</h1>
+                <div className="text-xs text-gray-600 mt-1">Tu sistema de acompañamiento financiero</div>
+                <div className="flex items-center gap-3 text-sm text-gray-600 mt-2">
                   <span>📅 Corte: día {cutoffDay}</span>
                   <span>⏳ Días para pagar: {daysToPayInput}</span>
                   <span className="text-red-600 font-semibold">⏰ Límite pago: día {effectivePaymentDueDay}</span>
@@ -697,11 +701,11 @@ export default function CreditCardPlanner() {
           </div>
 
           {showSettings && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-lg mb-4">Configuración Actual</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Límite de Crédito</label>
+                  <label className="block text-sm font-medium mb-1">Límite de Crédito</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-gray-500 font-medium text-sm">RD$</span>
                     <input
@@ -714,7 +718,7 @@ export default function CreditCardPlanner() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
+                  <label className="block text-sm font-medium mb-1">Tasa Mensual (%)</label>
                   <input
                     type="number"
                     value={monthlyRateInput}
@@ -725,7 +729,7 @@ export default function CreditCardPlanner() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Anual</label>
+                  <label className="block text-sm font-medium mb-1">Tasa Anual</label>
                   <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
                     {computedAnnualDisplay !== '-' ? `${computedAnnualDisplay}%` : '-'}
                   </div>
@@ -734,7 +738,7 @@ export default function CreditCardPlanner() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-4 text-white">
               <div className="text-xs opacity-90 mb-1">Balance Actual</div>
               <div className="text-xl font-bold">{formatCurrency(balance)}</div>
@@ -757,8 +761,8 @@ export default function CreditCardPlanner() {
             </div>
           </div>
 
-          <div className="mb-6">
-            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
+          <div className="mb-4">
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-3 mb-4 rounded">
               <div className="flex gap-3 items-center">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
                 <p className="text-sm text-amber-800">
