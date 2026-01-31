@@ -8,7 +8,8 @@ export default function CreditCardPlanner() {
   const [gameState, setGameState] = useState('setup');
   const [balance, setBalance] = useState(0);
   const [creditLimit, setCreditLimit] = useState(0);
-  const [monthlyRate, setMonthlyRate] = useState(0.05);
+  const [annualRate, setAnnualRate] = useState(4.5); // default annual rate 4.5%
+  const monthlyRate = annualRate / 12 / 100; // derived monthly rate (decimal)
   const [totalInterestPaid, setTotalInterestPaid] = useState(0);
   const [achievements, setAchievements] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
@@ -36,7 +37,7 @@ export default function CreditCardPlanner() {
 
   const minPayment = Math.max(balance * 0.05, 25);
   const availableCredit = creditLimit - balance;
-  const annualRate = (monthlyRate * 12 * 100).toFixed(1);
+  const annualRateDisplay = Number(annualRate).toFixed(1);
 
   // Calcular fecha límite de pago dinámicamente basada en días para pagar
   const calculatePaymentDueDay = () => {
@@ -615,16 +616,17 @@ export default function CreditCardPlanner() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa de Interés (%)</label>
+                  <label className="block text-sm font-medium mb-2">Tasa Anual (%)</label>
                   <input
                     type="number"
-                    value={(monthlyRate * 100).toFixed(2)}
-                    onChange={(e) => setMonthlyRate(Math.max(0, parseFloat(e.target.value) || 0) / 100)}
+                    value={annualRate.toFixed(2)}
+                    onChange={(e) => setAnnualRate(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     step="0.1"
+                    min="0"
                   />
                   <div className="text-sm text-gray-500 mt-1">
-                    Anual: {annualRate}%
+                    Anual: {annualRateDisplay}%
                   </div>
                 </div>
               </div>
@@ -711,11 +713,11 @@ export default function CreditCardPlanner() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
+                  <label className="block text-sm font-medium mb-2">Tasa Anual (%)</label>
                   <input
                     type="number"
-                    value={(monthlyRate * 100).toFixed(2)}
-                    onChange={(e) => setMonthlyRate(Math.max(0, parseFloat(e.target.value) || 0) / 100)}
+                    value={annualRate.toFixed(2)}
+                    onChange={(e) => setAnnualRate(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     step="0.1"
                     min="0"
@@ -724,7 +726,7 @@ export default function CreditCardPlanner() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Tasa Anual</label>
                   <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
-                    {annualRate}%
+                    {annualRateDisplay}%
                   </div>
                 </div>
               </div>
