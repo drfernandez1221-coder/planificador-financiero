@@ -8,13 +8,14 @@ export default function CreditCardPlanner() {
   const [gameState, setGameState] = useState('setup');
   const [balance, setBalance] = useState(0);
   const [creditLimit, setCreditLimit] = useState(0);
-  const [annualRate, setAnnualRate] = useState(4.5); // default annual rate 4.5%
-  const monthlyRate = annualRate / 12 / 100; // derived monthly rate (decimal)
+  const [monthlyRateInput, setMonthlyRateInput] = useState('4.5'); // default monthly rate (%) as string (editable & clearable)
+  const monthlyRate = (parseFloat(monthlyRateInput) || 0) / 100; // derived monthly rate (decimal)
+  const computedAnnualDisplay = monthlyRateInput === '' ? '-' : (monthlyRate * 12 * 100).toFixed(1);
   const [totalInterestPaid, setTotalInterestPaid] = useState(0);
-  const [achievements, setAchievements] = useState([]);
-  const [showWarning, setShowWarning] = useState(false);
+  const [_achievements, setAchievements] = useState([]);
+  const [_showWarning, setShowWarning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showCellMenu, setShowCellMenu] = useState(null);
+  const [_showCellMenu, setShowCellMenu] = useState(null);
   
   const [customPayment, setCustomPayment] = useState('');
   const [additionalPayment, setAdditionalPayment] = useState('');
@@ -37,7 +38,6 @@ export default function CreditCardPlanner() {
 
   const minPayment = Math.max(balance * 0.05, 25);
   const availableCredit = creditLimit - balance;
-  const annualRateDisplay = Number(annualRate).toFixed(1);
 
   // Calcular fecha límite de pago dinámicamente basada en días para pagar
   const calculatePaymentDueDay = () => {
@@ -110,7 +110,7 @@ export default function CreditCardPlanner() {
   };
 
   // Función para parsear montos desde formato RD$XXX,XXX.XX
-  const parseCurrency = (value) => {
+  const _parseCurrency = (value) => {
     if (!value) return 0;
     // Remover "RD$", espacios y puntos de miles
     const cleaned = value.replace(/RD\$|[\s.]/g, '').replace(',', '.');
@@ -192,25 +192,25 @@ export default function CreditCardPlanner() {
       
       // Ajustar el último pago para que saldar exactamente o con margen de 0.10
       let testBalance = balance;
-      let totalInterest = totalInterestPaid;
+      let _totalInterest = totalInterestPaid;
       for (let i = 0; i < planMonths; i++) {
         const payment = parseFloat(graduatedPlan[i]);
         const interest = testBalance * monthlyRate;
         const principal = payment - interest;
         testBalance = Math.max(testBalance - principal, 0);
-        totalInterest += interest;
+        _totalInterest += interest;
       }
       
       // Si queda remanente, ajustarlo en el último pago
       if (testBalance > 0.10) {
         let adjustedBalance = balance;
-        let adjustedInterest = totalInterestPaid;
+        let _adjustedInterest = totalInterestPaid;
         for (let i = 0; i < planMonths - 1; i++) {
           const payment = parseFloat(graduatedPlan[i]);
           const interest = adjustedBalance * monthlyRate;
           const principal = payment - interest;
           adjustedBalance -= principal;
-          adjustedInterest += interest;
+          _adjustedInterest += interest;
         }
         // Último pago debe ser suficiente para pagar el balance + interés
         const lastInterest = adjustedBalance * monthlyRate;
@@ -222,7 +222,7 @@ export default function CreditCardPlanner() {
     }
   };
 
-  const fillCellWithPercentage = (cellIndex, percentage) => {
+  const _fillCellWithPercentage = (cellIndex, percentage) => {
     const newPlan = [...paymentPlan];
     const cellPayment = minPayment * (1 + percentage / 100);
     newPlan[cellIndex] = cellPayment.toFixed(2);
@@ -285,7 +285,7 @@ export default function CreditCardPlanner() {
 
   const planProjection = calculatePlanProjection();
   
-  const updatePaymentPlan = (index, value) => {
+  const _updatePaymentPlan = (index, value) => {
     const newPlan = [...paymentPlan];
     newPlan[index] = value;
     setPaymentPlan(newPlan);
@@ -335,13 +335,13 @@ export default function CreditCardPlanner() {
     ? calculateProjection(parseFloat(customPayment), parseFloat(additionalPayment) || 0)
     : { months: 0, totalInterest: 0 };
 
-  const achievementsList = {
+  const _achievementsList = {
     big_payment: { icon: '💪', text: 'Pagaste el doble del mínimo' },
     consistent: { icon: '🎯', text: 'Tres pagos consecutivos sobre el mínimo' },
     debt_free: { icon: '🎉', text: '¡Libre de deudas!' }
   };
 
-  const generatePaymentPlan = () => {
+  const _generatePaymentPlan = () => {
     const recommendedPayment = Math.max(minPayment * 1.5, 50);
     const projection = calculateProjection(recommendedPayment);
     
@@ -616,17 +616,18 @@ export default function CreditCardPlanner() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Anual (%)</label>
+                  <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
                   <input
                     type="number"
-                    value={annualRate.toFixed(2)}
-                    onChange={(e) => setAnnualRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                    value={monthlyRateInput}
+                    onChange={(e) => setMonthlyRateInput(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     step="0.1"
                     min="0"
+                    placeholder="4.5"
                   />
                   <div className="text-sm text-gray-500 mt-1">
-                    Anual: {annualRateDisplay}%
+                    Anual: {computedAnnualDisplay !== '-' ? `${computedAnnualDisplay}%` : '-'}
                   </div>
                 </div>
               </div>
@@ -636,7 +637,7 @@ export default function CreditCardPlanner() {
               <h3 className="font-bold text-blue-900 mb-3 text-base">📋 Resumen</h3>
               <div className="text-sm text-blue-900 space-y-2 font-medium">
                 <div>• Límite: {formatCurrency(creditLimit)} • Balance: {formatCurrency(balance)}</div>
-                <div>• Tasa: {annualRate}% anual • Corte: día {cutoffDay || '-'}</div>
+                <div>• Tasa: {monthlyRateInput || '-'}% mensual • Anual: {computedAnnualDisplay !== '-' ? `${computedAnnualDisplay}%` : '-'} • Corte: día {cutoffDay || '-'}</div>
                 <div>• Días para pagar: {daysToPayInput || '-'} • Límite pago: día {effectivePaymentDueDay || '-'}</div>
               </div>
             </div>
@@ -713,11 +714,11 @@ export default function CreditCardPlanner() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tasa Anual (%)</label>
+                  <label className="block text-sm font-medium mb-2">Tasa Mensual (%)</label>
                   <input
                     type="number"
-                    value={annualRate.toFixed(2)}
-                    onChange={(e) => setAnnualRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                    value={monthlyRateInput}
+                    onChange={(e) => setMonthlyRateInput(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     step="0.1"
                     min="0"
@@ -726,7 +727,7 @@ export default function CreditCardPlanner() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Tasa Anual</label>
                   <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
-                    {annualRateDisplay}%
+                    {computedAnnualDisplay !== '-' ? `${computedAnnualDisplay}%` : '-'}
                   </div>
                 </div>
               </div>
